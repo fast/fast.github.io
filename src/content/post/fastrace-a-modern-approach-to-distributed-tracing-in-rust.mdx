@@ -223,11 +223,13 @@ fastrace = "0.7"  # No 'enable' feature
 ```
 
 When an application uses this library and doesn't enable the 'enable' feature of `fastrace`:
+
 - All tracing code is completely optimized away at compile time
 - Zero runtime overhead is added to the library
 - No impact on performance-critical code paths
 
 When the application does enable tracing via the 'enable' feature:
+
 - Instrumentation in the dedicated library becomes active
 - Spans are collected and reported
 - The application gets full visibility into library behavior
@@ -355,13 +357,10 @@ fn setup_observability(service_name: &str) {
 
 `fastrace` represents a modern approach to distributed tracing in Rust. The most significant advantages of `fastrace` are:
 
-1. **Zero Runtime Overhead When Disabled**: Libraries can add rich instrumentation without worrying about performance impact when tracing is not enabled by the application.
-
-2. **No Ecosystem Lock-In**: Libraries can use `fastrace` without forcing their users into a specific logging ecosystem.
-
-3. **Simple API Surface**: The minimal API surface makes it easy to add comprehensive tracing with little code.
-
-4. **Predictable Performance**: `fastrace`'s performance characteristics are consistent and predictable, even under high load.
+- **Zero Runtime Overhead When Disabled**: Libraries can add rich instrumentation without worrying about performance impact when tracing is not enabled by the application.
+- **No Ecosystem Lock-In**: Libraries can use `fastrace` without forcing their users into a specific logging ecosystem.
+- **Simple API Surface**: The minimal API surface makes it easy to add comprehensive tracing with little code.
+- **Predictable Performance**: `fastrace`'s performance characteristics are consistent and predictable, even under high load.
 
 An ecosystem where libraries are comprehensively instrumented with `fastrace` would enable unprecedented visibility into applications, without the performance or compatibility concerns that have historically prevented such instrumentation.
 
