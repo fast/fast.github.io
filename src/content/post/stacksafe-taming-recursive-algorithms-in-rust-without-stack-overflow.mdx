@@ -1,0 +1,305 @@
+---
+title: "StackSafe: Taming Recursive Algorithms in Rust Without Stack Overflow"
+tags:
+  - Memory Safety
+pubDate: 2025-07-24
+---
+
+## TL;DR
+
+Recursive algorithms in Rust can easily cause stack overflows that crash your program:
+
+```rust
+fn tree_depth(node: &TreeNode) -> usize {
+    match node {
+        TreeNode::Leaf => 1,
+        TreeNode::Branch(left, right) => {
+            1 + tree_depth(left).max(tree_depth(right))
+        }
+    }
+}
+
+// This panics: thread 'main' panicked at 'stack overflow'
+let deep_tree = create_deep_tree(100000);
+println!("{}", tree_depth(&deep_tree));
+```
+
+[StackSafe](https://github.com/fast/stacksafe) solves this by automatically growing the stack in recursive functions and data structures. Just add `#[stacksafe]` and your code works without crashes:
+
+```rust
+use stacksafe::stacksafe;
+
+#[stacksafe]  // Add attribute to recursive functions
+fn tree_depth(node: &TreeNode) -> usize {
+    match node {
+        TreeNode::Leaf => 1,
+        TreeNode::Branch(left, right) => {
+            1 + tree_depth(left).max(tree_depth(right))
+        }
+    }
+}
+
+// No panic, works perfectly!
+let deep_tree = create_deep_tree(100000);
+println!("{}", tree_depth(&deep_tree));
+```
+
+`StackSafe` is being used in production by products like [ScopeDB](https://www.scopedb.io/blog/manage-observability-data-in-petabytes), where it helps trace and debug petabyte-scale observability data workloads.
+
+## The Stack Overflow Problem
+
+Recursive algorithms are elegant and intuitive, but they come with a fundamental limitation: stack overflow. Consider another common scenario:
+
+```rust
+// JSON parsing - will crash on deeply nested JSON
+fn parse_value(tokens: &mut TokenStream) -> JsonValue {
+    match tokens.peek() {
+        Token::LeftBrace => parse_object(tokens),  // Recursive call
+        Token::LeftBracket => parse_array(tokens), // Recursive call
+        _ => parse_primitive(tokens),
+    }
+}
+```
+
+A sufficiently deep structure will cause your program to crash with `stack overflow`, and there's no clean way to predict or handle this in standard Rust.
+
+## Existing Solutions
+
+### Manual Transformation to Iterative Code
+
+The most common approach is rewriting recursive algorithms as loops with explicit stacks:
+
+```rust
+fn parse_value_iterative(tokens: &mut TokenStream) -> JsonValue {
+    let mut stack = vec![ParseState::ParseValue];
+    let mut results = Vec::new();
+    
+    while let Some(state) = stack.pop() {
+        match state {
+            ParseState::ParseValue => {
+                match tokens.peek() {
+                    Token::LeftBrace => {
+                        stack.push(ParseState::ParseObject(HashMap::new()));
+                    }
+                    Token::LeftBracket => {
+                        stack.push(ParseState::ParseArray(Vec::new()));
+                    }
+                    _ => {
+                        results.push(parse_primitive(tokens));
+                    }
+                }
+            }
+            ParseState::ParseObject(mut obj) => {
+                // Complex state management for nested objects...
+            }
+            ParseState::ParseArray(mut arr) => {
+                // Complex state management for nested arrays...
+            }
+        }
+    }
+    
+    results.pop().unwrap()
+}
+```
+
+This approach works for simple cases but becomes extremely complex or impossible when any of these conditions apply:
+
+1. The algorithm transforms data structures rather than just evaluating them (e.g., optimizing an AST)
+2. Multiple recursive calls need to be coordinated (e.g., tree balancing algorithms)
+3. The algorithm doesn't fit the tail-recursion pattern
+
+### Lower-Level Crates: `stacker` and `recursive`
+
+- [stacker](https://crates.io/crates/stacker): Provides low-level stack growth mechanisms
+- [recursive](https://crates.io/crates/recursive): Provides a `#[recursive]` to ease the application of `stacker`
+
+**Limitations**:
+
+- You must carefully not leaving any recursive functions not annotated with `#[recursive]`
+- Derived traits like `Debug`, `Clone`, and `Drop` on deeply nested structures still cause stack overflow, you must manually implement all traits with stack protection:
+
+```rust
+#[derive(Clone, Debug)]
+enum Tree {
+    Leaf(i32),
+    Node(Box<Tree>, Box<Tree>),
+}
+
+#[recursive::recursive]
+fn create_deep_tree(depth: usize) -> Tree {
+    if depth == 0 {
+        Tree::Leaf(42)
+    } else {
+        Tree::Node(
+            Box::new(create_deep_tree(depth - 1)),
+            Box::new(Tree::Leaf(0))
+        )
+    }
+}
+
+let deep_tree = create_deep_tree(10000);
+let cloned = deep_tree.clone();  // Stack overflow: derived Clone is recursive!
+println!("{:?}", cloned);        // Stack overflow: derived Debug is recursive!
+// Stack overflow when `deep_tree` is dropped: derived Drop is recursive!
+```
+
+## `StackSafe`: The Complete Solution
+
+`StackSafe` addresses both recursive functions and recursive data structures with a simple, unified approach.
+
+### Recursive Functions Made Safe
+
+Transform any recursive function by adding `#[stacksafe]`:
+
+```rust
+use stacksafe::stacksafe;
+
+#[stacksafe]
+fn fibonacci(n: u64) -> u64 {
+    match n {
+        0 | 1 => n,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+#[stacksafe]
+fn evaluate_ast(expr: &Expr) -> i32 {
+    match expr {
+        Expr::Number(n) => *n,
+        Expr::Add(left, right) => evaluate_ast(left) + evaluate_ast(right),
+        Expr::Multiply(left, right) => evaluate_ast(left) * evaluate_ast(right),
+    }
+}
+```
+
+### Recursive Data Structures Made Safe
+
+Wrap recursive fields with `StackSafe<T>` for automatic stack-safe trait implementations:
+
+```rust
+use stacksafe::{stacksafe, StackSafe};
+
+#[derive(Debug, Clone, PartialEq)]  // All traits are automatically stack-safe!
+enum BinaryTree {
+    Leaf(i32),
+    Node {
+        value: i32,
+        left: StackSafe<Box<BinaryTree>>,
+        right: StackSafe<Box<BinaryTree>>,
+    },
+}
+
+// All operations work safely on arbitrarily deep trees:
+let deep_tree = create_deep_tree(100000);
+let cloned = deep_tree.clone();           // No stack overflow
+let are_equal = deep_tree == cloned;      // No stack overflow
+println!("{:?}", deep_tree);              // No stack overflow
+drop(deep_tree);                          // No stack overflow
+```
+
+### Debug-Time Safety Checks
+
+`StackSafe<T>` exposes the wrapped value through Rust's `Deref` trait, allowing transparent access to the underlying data. However, it includes an important safety mechanism: in debug builds, it checks whether the current function is properly annotated with `#[stacksafe]` whenever you access the wrapped value.
+
+```rust
+fn unsafe_tree_sum(tree: &BinaryTree) -> i32 {
+    match tree {
+        BinaryTree::Leaf(value) => *value,
+        BinaryTree::Node { value, left, right } => {
+            // This will panic in debug builds:
+            // "StackSafe should only be accessed within a stack-safe context"
+            // Missing #[stacksafe] annotation!
+            value + tree_sum(left) + tree_sum(right)
+        }
+    }
+}
+
+#[stacksafe]
+fn safe_tree_sum(tree: &BinaryTree) -> i32 {
+    match tree {
+        BinaryTree::Leaf(value) => *value,
+        BinaryTree::Node { value, left, right } => {
+            // Works fine - properly protected
+            value + tree_sum(left) + tree_sum(right)
+        }
+    }
+}
+```
+
+This debug-time checking helps you identify all potential stack overflow locations during development, rather than discovering them in production when they cause crashes.
+
+### Adopting `StackSafe` in Existing Code
+
+Converting existing recursive code is straightforward. Here's a real-world example:
+
+**Before** (crash-prone):
+```rust
+#[derive(Debug, Clone)]
+pub enum JsonValue {
+    Object(HashMap<String, JsonValue>),
+    Array(Vec<JsonValue>),
+    String(String),
+    Number(f64),
+}
+
+fn parse_json(input: &str) -> JsonValue {
+    parse_value(&mut tokenize(input))
+}
+
+fn stringify(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Object(map) => {
+            let items: Vec<_> = map.iter()
+                .map(|(k, v)| format!("\"{}\":{}", k, stringify(v)))
+                .collect();
+            format!("{{{}}}", items.join(","))
+        }
+        // ...other cases
+    }
+}
+```
+
+**After** (stack-safe):
+```rust
+use stacksafe::{stacksafe, StackSafe};
+
+#[derive(Debug, Clone)]
+pub enum JsonValue {
+    Object(HashMap<String, StackSafe<JsonValue>>),  // Wrap recursive fields
+    Array(Vec<StackSafe<JsonValue>>),               // Wrap recursive fields
+    String(String),
+    Number(f64),
+}
+
+fn parse_json(input: &str) -> JsonValue {
+    parse_value(&mut tokenize(input))
+}
+
+#[stacksafe]  // Add attribute to recursive functions
+fn stringify(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Object(map) => {
+            let items: Vec<_> = map.iter()
+                .map(|(k, v)| format!("\"{}\":{}", k, stringify(v)))
+                .collect();
+            format!("{{{}}}", items.join(","))
+        }
+        // ...other cases
+    }
+}
+```
+
+The changes are minimal, but the result is a completely stack-safe JSON processor that can handle arbitrarily deep nesting.
+
+## Conclusion
+
+`StackSafe` eliminates the fundamental tension between writing elegant recursive code and avoiding stack overflows. By handling both recursive functions and data structures comprehensively, it lets you focus on algorithm logic rather than stack management.
+
+- **Simple adoption**: Add `#[stacksafe]` to functions and `StackSafe<T>` to recursive fields
+- **Complete protection**: Covers both function calls and trait operations
+
+## Resources
+
+- Crate: https://crates.io/crates/stacksafe
+- Documents: https://docs.rs/stacksafe/
+- GitHub: https://github.com/fast/stacksafe
