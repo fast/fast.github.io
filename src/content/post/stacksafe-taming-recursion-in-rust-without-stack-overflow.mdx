@@ -199,7 +199,7 @@ drop(deep_tree);                          // No stack overflow
 
 ### Debug-Time Safety Checks
 
-`StackSafe<T>` exposes the wrapped value through Rust's `Deref` trait, allowing transparent access to the underlying data. However, it includes an important safety mechanism: in debug builds, it checks whether the current function is properly annotated with `#[stacksafe]` whenever you access the wrapped value.
+`StackSafe<T>` exposes the wrapped value through Rust's `Deref` trait, allowing transparent access to the underlying data. What's more, it includes an important safety mechanism: in debug builds, it checks whether the current function is properly annotated with `#[stacksafe]` whenever you access the wrapped value.
 
 ```rust
 fn unsafe_tree_sum(tree: &BinaryTree) -> i32 {
@@ -226,13 +226,14 @@ fn safe_tree_sum(tree: &BinaryTree) -> i32 {
 }
 ```
 
-This debug-time checking helps you identify all potential stack overflow locations during development, rather than discovering them in production when they cause crashes.
+This debug-time check helps you identify all potential stack overflow locations during development, rather than discovering them in production when they cause crashes.
 
 ### Adopting `StackSafe` in Existing Code
 
 Converting existing recursive code is straightforward. Here's a real-world example:
 
 **Before** (crash-prone):
+
 ```rust
 #[derive(Debug, Clone)]
 pub enum JsonValue {
@@ -260,6 +261,7 @@ fn stringify(value: &JsonValue) -> String {
 ```
 
 **After** (stack-safe):
+
 ```rust
 use stacksafe::{stacksafe, StackSafe};
 
@@ -301,5 +303,5 @@ The changes are minimal, but the result is a completely stack-safe JSON processo
 ## Resources
 
 - Crate: https://crates.io/crates/stacksafe
-- Documents: https://docs.rs/stacksafe/
+- Documents: https://docs.rs/stacksafe
 - GitHub: https://github.com/fast/stacksafe
