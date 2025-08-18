@@ -209,7 +209,7 @@ fn unsafe_tree_sum(tree: &BinaryTree) -> i32 {
             // This will panic in debug builds:
             // "StackSafe should only be accessed within a stack-safe context"
             // Missing #[stacksafe] annotation!
-            value + tree_sum(left) + tree_sum(right)
+            value + unsafe_tree_sum(left) + unsafe_tree_sum(right)
         }
     }
 }
@@ -220,7 +220,7 @@ fn safe_tree_sum(tree: &BinaryTree) -> i32 {
         BinaryTree::Leaf(value) => *value,
         BinaryTree::Node { value, left, right } => {
             // Works fine - properly protected
-            value + tree_sum(left) + tree_sum(right)
+            value + safe_tree_sum(left) + safe_tree_sum(right)
         }
     }
 }
