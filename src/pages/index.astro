@@ -47,24 +47,28 @@ const posts = [...postCollection]
 
 <PageLayout>
   <section class="relative mb-16">
-    <h3 class="text-[40px] font-semibold leading-tight text-slate12">
+    <h3 class="text-slate12 text-[40px] leading-tight font-semibold">
       {slateConfig.title}
     </h3>
-    <p class="text-xl text-slate10">{slateConfig.description}</p>
+    <p class="text-slate10 text-xl">{slateConfig.description}</p>
     <Search
       client:only="react"
-      className="absolute right-0 top-1/2 -translate-y-1/2"
+      className="absolute top-1/2 right-0 -translate-y-1/2"
     />
   </section>
 
   <section class="mb-16">
-    <div class="text-base text-slate12">
+    <div class="text-slate12 text-base">
       {
         posts.map((item) => (
-          <a class="flex cursor-pointer flex-col justify-between rounded-lg py-2.5 transition-all active:scale-[0.995] active:bg-slate4 sm:flex-row sm:items-center sm:px-2 sm:hover:bg-slate3" href={item.url} title={item.data.title}>
+          <a
+            class="active:bg-slate4 sm:hover:bg-slate3 flex cursor-pointer flex-col justify-between rounded-lg py-2.5 transition-all active:scale-[0.995] sm:flex-row sm:items-center sm:px-2"
+            href={item.url}
+            title={item.data.title}
+          >
             <span class="shrink-0">{item.data.title}</span>
-            <span class="mx-8 hidden h-px w-full grow border-t border-dashed border-slate6 sm:flex" />
-            <span class="shrink-0 text-slate8">
+            <span class="border-slate6 mx-8 hidden h-px w-full grow border-t border-dashed sm:flex" />
+            <span class="text-slate8 shrink-0">
               {item.data.pubDate?.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -80,12 +84,12 @@ const posts = [...postCollection]
 
   <!-- S 标签 -->
   <section class="mb-16">
-    <ul class="flex flex-wrap gap-2 text-base text-slate10">
+    <ul class="text-slate10 flex flex-wrap gap-2 text-base">
       {
         tags.map(({ name, count }) => (
-          <li class="block cursor-pointer rounded-full bg-slate3 px-4 py-2 text-slate10 transition-all hover:bg-slate4 hover:text-slate11">
+          <li class="bg-slate3 text-slate10 hover:bg-slate4 hover:text-slate11 block cursor-pointer rounded-full px-4 py-2 transition-all">
             {name}
-            <sup class="text-[10px] text-slate8">{count}</sup>
+            <sup class="text-slate8 text-[10px]">{count}</sup>
           </li>
         ))
       }

@@ -43,7 +43,7 @@ Rust's `std::backtrace::Backtrace` was meant to improve error observability. The
 
 **They only show the origin, not the path.** A backtrace tells you where the error was *created*, not the logical path it took through your application. It won't tell you "this was the request handler for user X, calling service Y, with parameters Z."
 
-**Capturing backtraces is expensive.** [One developer reported](https://github.com/rust-lang-nursery/error-chain/issues/129) their web app took a third of a second just to construct an error, making it vulnerable to DoS attacks. The standard library documentation acknowledges: "Capturing a backtrace can be a quite expensive runtime operation."
+**Capturing backtraces is expensive. The standard library documentation acknowledges: "Capturing a backtrace can be a quite expensive runtime operation."
 
 ### The Provide/Request API: Overengineering in Action
 
@@ -335,8 +335,8 @@ At the boundary, walk the error tree to find the structured error:
 ```rust
 // Extract a typed error from anywhere in the tree
 fn find_error<T>(exn: &Exn<impl Error>) -> Option<&T> {
-    fn walk(frame: &Frame) -> Option<&T> {
-        if let Some(e) = frame.as_any().downcast_ref::<StorageError>() {
+    fn walk<T>(frame: &Frame) -> Option<&T> {
+        if let Some(e) = frame.as_any().downcast_ref::<T>() {
             return Some(e);
         }
         frame.children().iter().find_map(walk)

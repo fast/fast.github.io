@@ -46,7 +46,7 @@ function SocialLinks(props: SocialLinksProps) {
     <section className={classes}>
       {socialLinks.map((socialLink, index) => (
         <a
-          className="h-5 w-5 cursor-pointer text-slate10 hover:text-slate12 transition-all"
+          className="text-slate10 hover:text-slate12 h-5 w-5 cursor-pointer transition-all"
           href={socialLink.link}
           target="_blank"
           rel="noopener"

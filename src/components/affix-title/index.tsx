@@ -14,7 +14,9 @@ const AffixTitle = (props: AffixTitleProps) => {
 
   const classes = classNames(
     'fixed left-0 right-0 top-0 w-full transform bg-slate1/90 backdrop-blur-md transition-all duration-300 ease-in-out z-10',
-    isVisible ? ['translate-y-0', 'opacity-100'] : ['-translate-y-full', 'opacity-0'],
+    isVisible
+      ? ['translate-y-0', 'opacity-100']
+      : ['-translate-y-full', 'opacity-0'],
   );
 
   const handleScroll = () => {
@@ -25,21 +27,18 @@ const AffixTitle = (props: AffixTitleProps) => {
   useEffect(() => {
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
   return (
-    <div
-      ref={affixTitleRef}
-      className={classes}
-    >
-      <div className="mx-auto flex items-center justify-between px-4 max-w-180">
+    <div ref={affixTitleRef} className={classes}>
+      <div className="mx-auto flex max-w-180 items-center justify-between px-4">
         <button
-          onClick={() => window.location.href = '/'}
-          className="text-slate11 hover:text-slate12 transition-colors w-8 cursor-pointer active:scale-95 rounded-full h-6 flex items-center justify-center hover:bg-slate12/5"
+          onClick={() => (window.location.href = '/')}
+          className="text-slate11 hover:text-slate12 hover:bg-slate12/5 flex h-6 w-8 cursor-pointer items-center justify-center rounded-full transition-colors active:scale-95"
         >
           ←
         </button>

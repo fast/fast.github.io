@@ -87,7 +87,7 @@
   }
 
   table {
-    @apply ring-slate4 my-6 w-full border-collapse overflow-hidden rounded-xl ring-1;
+    @apply ring-slate4 my-6 block w-full border-collapse overflow-x-auto rounded-xl ring-1;
 
     thead {
       @apply border-slate4 bg-slate3 border-b text-left;

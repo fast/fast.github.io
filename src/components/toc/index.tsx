@@ -26,7 +26,7 @@ function Toc(props: TocProps) {
                 return (
                   <li key={item.slug}>
                     <a
-                      className="inline-block cursor-pointer py-0.5 transition-colors hover:text-slate12"
+                      className="hover:text-slate12 inline-block cursor-pointer py-0.5 transition-colors"
                       style={{ marginLeft: `${(item.depth - 2) * 8}px` }}
                       href={`#${item.slug}`}
                     >
