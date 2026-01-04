@@ -215,7 +215,7 @@ No more traversing error chains, no more guessing from error types. Just ask the
 
 The biggest enemy of good error context isn't capability--it's friction. If adding context is annoying, developers won't do it.
 
-The [exn](https://github.com/fast/exn) library (841 lines of Rust, zero dependencies) demonstrates one approach: errors form a *tree* of frames, each automatically capturing its source location via `#[track_caller]`. Unlike linear error chains, trees can represent multiple causes--useful when parallel operations fail or validation produces multiple errors.
+The [exn](https://github.com/fast/exn) library (294 lines of Rust, zero dependencies) demonstrates one approach: errors form a *tree* of frames, each automatically capturing its source location via `#[track_caller]`. Unlike linear error chains, trees can represent multiple causes--useful when parallel operations fail or validation produces multiple errors.
 
 Here's what we need:
 
