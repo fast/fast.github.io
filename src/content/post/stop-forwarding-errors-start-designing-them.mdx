@@ -252,7 +252,7 @@ fn fetch_user(user_id: &str) -> Result<User, AppError> {
 }
 ```
 
-**Enforce context at library / module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always just `?` and move on--the type system won't stop you. The context methods exist, but nothing *forces* you to use them.
+**Enforce context at module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always use `?` and move on--the type system won't stop you. The context methods exist, but nothing *forces* you to use them.
 
 exn takes a different approach: `Exn<E>` preserves the outermost error type. If your function returns `Result<T, Exn<ServiceError>>`, you can't directly `?` a `Result<U, Exn<DatabaseError>>`--the types don't match. The compiler *forces* you to call `or_raise()` and provide a `ServiceError`, which is exactly the moment you should be adding context about what your module was trying to do.
 
