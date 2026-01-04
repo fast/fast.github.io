@@ -264,7 +264,7 @@ pub fn fetch_user(user_id: &str) -> Result<User, Exn<ServiceError>> {
 // You must provide context at the boundary
 pub fn fetch_user(user_id: &str) -> Result<User, Exn<ServiceError>> {
     let user = db.query(user_id)
-        .or_raise(|| ServiceError(format!("failed to query user {user_id}")))?;  // Now it compiles
+        .or_raise(|| ServiceError(format!("failed to fetch user {user_id}")))?;  // Now it compiles
     Ok(user)
 }
 ```
@@ -277,12 +277,8 @@ Here's what this looks like in practice:
 pub async fn execute(&self, task: Task) -> Result<Output, ExecutorError> {
     let make_error = || ExecutorError(format!("failed to execute task {}", task.id));
 
-    let user = self.fetch_user(task.user_id)
-        .await
-        .or_raise(make_error)?;
-
-    let result = self.process(user)
-        .or_raise(make_error)?;
+    let user = self.fetch_user(task.user_id).await.or_raise(make_error)?;
+    let result = self.process(user).or_raise(make_error)?;
 
     Ok(result)
 }
@@ -298,7 +294,7 @@ failed to execute task 7829, at src/executor.rs:45:12
 |-> connection refused, at src/client.rs:89:24
 ```
 
-Now you know: it was task-7829, we were fetching data, and the connection was refused. You can grep for that task ID in your request logs and find everything you need.
+Now you know: it was task 7829, we were fetching user data, and the connection was refused. You can grep for that task ID in your request logs and find everything you need.
 
 ---
 
@@ -353,12 +349,13 @@ match save_document(doc).await {
             }
             return Err(map_to_http_status(err.kind));
         }
+
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 ```
 
-Yes, you need to walk the tree--but compare this to the `Provide`/`Request` API. Here, you're looking for a *concrete type* like `StorageError`. It has named fields. It has documentation. Your IDE can autocomplete it. No guessing, no runtime surprises--just a well-defined struct you can reason about and maintain.
+Yes, you still need to walk the tree. But unlike the `Provide`/`Request` API, you end up with a concrete type like `StorageError`—a documented struct with named fields that your IDE can autocomplete. No guessing, no runtime surprises—just something you can reason about and maintain.
 
 ---
 
