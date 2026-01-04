@@ -91,7 +91,7 @@ As one blogger [aptly put it](https://mmapped.blog/posts/12-rust-error-handling)
 
 `anyhow` takes the opposite approach: type erasure. Just use `anyhow::Result<T>` everywhere and propagate with `?`. No more enum variants, no more `#[from]` annotations.
 
-The problem? It's *over* convenient.
+The problem? It's *too* convenient.
 
 ```rust
 fn process_request(req: Request) -> anyhow::Result<Response> {
@@ -104,7 +104,7 @@ fn process_request(req: Request) -> anyhow::Result<Response> {
 
 Every `?` is a missed opportunity to add context. What was the user ID? What API were we calling? What computation failed? The error knows none of this.
 
-The `anyhow` documentation encourages using `.context()` to add information. But when you're racing against a deadline, "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
+The `anyhow` documentation encourages using `.context()` to add information. But `.context()` is optional--the type system doesn't require it. Every `?` compiles just fine without context, making it trivially easy to skip. "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
 
 ---
 
@@ -129,15 +129,15 @@ This looks reasonable. But ask yourself:
 
 1. **What can the caller do with `ServiceError::Database`?** Can they retry? Should they show the raw SQL error to users? The error type doesn't help answer these questions.
 
-2. **When debugging at 3 AM, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?**
+2. **When debugging at 3 AM**, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?
 
-This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors correctly, on making the types line up, on satisfying the compiler. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
+This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors exactly, on making the types line up, on satisfying the compiler. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
 
 ## The "Library vs Application" Myth
 
 You've probably heard the conventional wisdom: *"Use `thiserror` for libraries, `anyhow` for applications."*
 
-It's a nice, simple rule. It's also not quite right. As [Luca Palmieri notes](https://lpalmieri.com/posts/error-handling-rust/): "It is not the right framing. You need to reason about intent."
+It's a nice, simple rule, just not quite right. As [Luca Palmieri notes](https://lpalmieri.com/posts/error-handling-rust/): "It is not the right framing. You need to reason about intent."
 
 The real question isn't whether you're writing a library or an application. The real question is: **what do you expect the caller to do with this error?**
 
