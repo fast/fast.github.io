@@ -15,7 +15,7 @@ You know JSON is broke. But you have zero idea *why*, *where*, or *who* caused i
 
 The error has successfully bubbled up through 20 layers of your stack, preserving its original message perfectly, yet losing every scrap of meaning along the way.
 
-We have a name for this. We call it "Error Handling." But in reality, it's just **Error Forwarding**. We treat errors like hot potatoes—catch them, wrap them (maybe), and throw them up the stack as fast as possible.
+We have a name for this. We call it "Error Handling." But in reality, it's just **Error Forwarding**. We treat errors like hot potatoes--catch them, wrap them (maybe), and throw them up the stack as fast as possible.
 
 You add a `println!`, restart the service, wait for the bug to reproduce. It's going to be a long night.
 
@@ -33,7 +33,7 @@ Rust's `std::error::Error` trait makes a fundamental assumption: errors form a c
 
 This sounds elegant. In practice, it's often useless.
 
-Many errors don't naturally form chains. A validation error with multiple field failures, a timeout with partial results—these don't fit the single-chain model.
+Many errors don't naturally form chains. A validation error with multiple field failures, a timeout with partial results--these don't fit the single-chain model.
 
 ### Backtraces: Expensive Medicine for the Wrong Disease
 
@@ -43,7 +43,7 @@ Rust's `std::backtrace::Backtrace` was meant to improve error observability. The
 
 **They only show the origin, not the path.** A backtrace tells you where the error was *created*, not the logical path it took through your application. It won't tell you "this was the request handler for user X, calling service Y, with parameters Z."
 
-**Capturing backtraces is expensive. The standard library documentation acknowledges: "Capturing a backtrace can be a quite expensive runtime operation."
+**Capturing backtraces is expensive.** The standard library documentation acknowledges: "Capturing a backtrace can be a quite expensive runtime operation."
 
 ### The Provide/Request API: Overengineering in Action
 
@@ -106,7 +106,7 @@ fn process_request(req: Request) -> anyhow::Result<Response> {
 
 Every `?` is a missed opportunity to add context. What was the user ID? What API were we calling? What computation failed? The error knows none of this.
 
-The anyhow documentation encourages using `.context()` to add information. But when you're racing against a deadline, "I'll add context later" is the easiest lie to tell yourself. Later means never—until 3am when production is on fire.
+The anyhow documentation encourages using `.context()` to add information. But when you're racing against a deadline, "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
 
 ---
 
@@ -133,7 +133,7 @@ This looks reasonable. But ask yourself:
 
 2. **When debugging at 3 AM, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?**
 
-This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors correctly, on making the types line up, on satisfying the compiler. But we forget that errors are messages—messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
+This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors correctly, on making the types line up, on satisfying the compiler. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
 
 ## The "Library vs Application" Myth
 
@@ -207,7 +207,7 @@ match result {
 
 Notice the key design decisions:
 
-**ErrorKind is categorized by response, not origin.** `NotFound` means "the thing doesn't exist, don't retry." `RateLimited` means "slow down and try again." The caller doesn't need to know whether it was an S3 404 or a filesystem ENOENT—they need to know what to do about it.
+**ErrorKind is categorized by response, not origin.** `NotFound` means "the thing doesn't exist, don't retry." `RateLimited` means "slow down and try again." The caller doesn't need to know whether it was an S3 404 or a filesystem ENOENT--they need to know what to do about it.
 
 **ErrorStatus is explicit.** Instead of guessing retryability from error types, it's a first-class field. Services can mark errors as temporary when they know a retry might help.
 
@@ -217,9 +217,9 @@ No more traversing error chains, no more guessing from error types. Just ask the
 
 ### For Humans: Low-Friction Context Capture
 
-The biggest enemy of good error context isn't capability—it's friction. If adding context is annoying, developers won't do it.
+The biggest enemy of good error context isn't capability--it's friction. If adding context is annoying, developers won't do it.
 
-The [exn](https://github.com/aspect-build/exn) library (841 lines of Rust, zero dependencies) demonstrates one approach: errors form a *tree* of frames, each automatically capturing its source location via `#[track_caller]`. Unlike linear error chains, trees can represent multiple causes—useful when parallel operations fail or validation produces multiple errors.
+The [exn](https://github.com/aspect-build/exn) library (841 lines of Rust, zero dependencies) demonstrates one approach: errors form a *tree* of frames, each automatically capturing its source location via `#[track_caller]`. Unlike linear error chains, trees can represent multiple causes--useful when parallel operations fail or validation produces multiple errors.
 
 Here's what we need:
 
@@ -254,12 +254,12 @@ fn fetch_user(user_id: &str) -> Result<User, AppError> {
 }
 ```
 
-**Enforce context at library / module boundaries.** This is where exn differs critically from anyhow. With anyhow, every error is erased to `anyhow::Error`, so you can always just `?` and move on — the type system won't stop you. The context methods exist, but nothing *forces* you to use them.
+**Enforce context at library / module boundaries.** This is where exn differs critically from anyhow. With anyhow, every error is erased to `anyhow::Error`, so you can always just `?` and move on--the type system won't stop you. The context methods exist, but nothing *forces* you to use them.
 
-exn takes a different approach: `Exn<E>` preserves the outermost error type. If your function returns `Result<T, Exn<ServiceError>>`, you can't directly `?` a `Result<U, Exn<DatabaseError>>`—the types don't match. The compiler *forces* you to call `or_raise()` and provide a `ServiceError`, which is exactly the moment you should be adding context about what your module was trying to do.
+exn takes a different approach: `Exn<E>` preserves the outermost error type. If your function returns `Result<T, Exn<ServiceError>>`, you can't directly `?` a `Result<U, Exn<DatabaseError>>`--the types don't match. The compiler *forces* you to call `or_raise()` and provide a `ServiceError`, which is exactly the moment you should be adding context about what your module was trying to do.
 
 ```rust
-// This won't compile — type mismatch forces you to add context
+// This won't compile--type mismatch forces you to add context
 pub fn fetch_user(user_id: &str) -> Result<User, Exn<ServiceError>> {
     let user = db.query(user_id)?;  // Error: expected Exn<ServiceError>, found Exn<DbError>
     Ok(user)
@@ -275,7 +275,7 @@ pub fn fetch_user(user_id: &str) -> Result<User, Exn<ServiceError>> {
 
 The type system becomes your ally: it won't let you be lazy at module boundaries.
 
-Here's what this looks like in practice (from a production codebase):
+Here's what this looks like in practice:
 
 ```rust
 pub async fn execute(&self, task: Task) -> Result<Output, ExecutorError> {
@@ -362,7 +362,7 @@ match save_document(doc).await {
 }
 ```
 
-Yes, you need to walk the tree — but compare this to the `Provide`/`Request` API. Here, you're looking for a *concrete type* like `StorageError`. It has named fields. It has documentation. Your IDE can autocomplete it. No guessing, no runtime surprises — just a well-defined struct you can reason about and maintain.
+Yes, you need to walk the tree--but compare this to the `Provide`/`Request` API. Here, you're looking for a *concrete type* like `StorageError`. It has named fields. It has documentation. Your IDE can autocomplete it. No guessing, no runtime surprises--just a well-defined struct you can reason about and maintain.
 
 ---
 
@@ -373,8 +373,8 @@ The next time you write a function, look at the `Result` return type.
 Don't think of it as "I might fail."
 Think of it as "I might need to explain myself."
 
-If your error type can't answer "Should I retry?" — you failed the Machine.
-If your error logs don't answer "Which user was it?" — you failed the Human.
+If your error type can't answer "Should I retry?"--you failed the Machine.
+If your error logs don't answer "Which user was it?"--you failed the Human.
 
 Errors aren't just failure modes to be propagated. They're communication. They're the messages your system sends when things go wrong. And like any communication, they deserve to be designed.
 
