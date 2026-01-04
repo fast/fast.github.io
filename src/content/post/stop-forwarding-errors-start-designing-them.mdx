@@ -15,7 +15,7 @@ You know JSON is broke. But you have zero idea *why*, *where*, or *who* caused i
 
 The error has successfully bubbled up through 20 layers of your stack, preserving its original message perfectly, yet losing every scrap of meaning along the way.
 
-We have a name for this. We call it "Error Handling." But the instance above is no more than **Error Forwarding**. We treat errors like hot potatoes--catch them, wrap them (maybe), and throw them up the stack as fast as possible.
+We have a name for this. We call it "Error Handling." But in reality, it's just **Error Forwarding**. We treat errors like hot potatoes--catch them, wrap them (maybe), and throw them up the stack as fast as possible.
 
 You add a `println!`, restart the service, wait for the bug to reproduce. It's going to be a long night.
 
@@ -29,11 +29,9 @@ As noted in a [detailed analysis of error handling in a large Rust project](http
 
 ### The `std::error::Error` Trait: A Noble but Flawed Abstraction
 
-Rust's `std::error::Error` trait makes a fundamental assumption: errors form a chain. Each error has an optional `source()` that points to the underlying cause.
+Rust's `std::error::Error` trait assumes errors form a chain--each error has an optional `source()` pointing to the underlying cause. This works for most cases; the vast majority of errors have no source or a single one.
 
-This sounds elegant. In practice, it's often useless.
-
-Many errors don't naturally form chains. A validation error with multiple field failures, a timeout with partial results--these don't fit the single-chain model.
+But as a *standard library* abstraction, it's too opinionated. It categorically excludes cases where sources form a tree: a validation error with multiple field failures, a timeout with partial results. These scenarios exist, and the standard trait offers no way to represent them.
 
 ### Backtraces: Expensive Medicine for the Wrong Disease
 
@@ -81,7 +79,7 @@ pub enum DatabaseError {
 }
 ```
 
-This looks reasonable. But notice how it categorizes errors: by *origin*, not by *what the caller can do about it*.
+This looks reasonable. But notice how this common practice categorizes errors: by *origin*, not by *what the caller can do about it*.
 
 When you receive a `DatabaseError::Query`, what should you do? Retry? Report to the user? Log and continue? The error doesn't tell you. It just tells you which dependency failed.
 
@@ -104,7 +102,7 @@ fn process_request(req: Request) -> anyhow::Result<Response> {
 
 Every `?` is a missed opportunity to add context. What was the user ID? What API were we calling? What computation failed? The error knows none of this.
 
-The `anyhow` documentation encourages using `.context()` to add information. But `.context()` is optional--the type system doesn't require it. Every `?` compiles just fine without context, making it trivially easy to skip. "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
+The `anyhow` documentation encourages using `.context()` to add information. But `.context()` is optional--the type system doesn't require it. "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
 
 ---
 
@@ -252,7 +250,7 @@ fn fetch_user(user_id: &str) -> Result<User, AppError> {
 }
 ```
 
-**Enforce context at module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always use `?` and move on--the type system won't stop you. The context methods exist, but nothing *forces* you to use them.
+**Enforce context at module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always use `?` and move on--the type system won't stop you. The context methods exist, but but *nothing* prevents you from ignoring them.
 
 exn takes a different approach: `Exn<E>` preserves the outermost error type. If your function returns `Result<T, Exn<ServiceError>>`, you can't directly `?` a `Result<U, Exn<DatabaseError>>`--the types don't match. The compiler *forces* you to call `or_raise()` and provide a `ServiceError`, which is exactly the moment you should be adding context about what your module was trying to do.
 
@@ -381,9 +379,11 @@ Stop forwarding errors. Start designing them.
 ## Resources
 
 - [OpenDAL Error Design RFC](https://github.com/apache/opendal/pull/977)
+- [OpenDAL's Error Handling Practices](https://xuanwo.io/en-us/reports/2022-46/)
 - [exn: Context-aware errors for Rust](https://github.com/fast/exn)
 - [Error Handling in Large Rust Projects (GreptimeDB)](https://greptime.com/blogs/2024-05-07-error-rust)
 - [A Guide to Error Handling that Just Works](https://bugenzhao.com/2024/04/24/error-handling-1/)
+- [Study of std::io::Error](https://matklad.github.io/2020/10/15/study-of-std-io-error.html)
 - [Error Handling In Rust - A Deep Dive](https://lpalmieri.com/posts/error-handling-rust/)
 - [Tracking Issue for Provider API](https://github.com/rust-lang/rust/issues/96024)
 - [Async Stack Traces Working Group](https://rust-lang.github.io/wg-async/design_docs/async_stack_traces.html)
