@@ -17,4 +17,3 @@ export function setThemeMode(mode: ThemeMode) {
   document.documentElement.className = mode;
   document.documentElement.dataset.theme = mode;
 }
-
