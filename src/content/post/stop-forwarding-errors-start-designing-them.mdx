@@ -47,7 +47,7 @@ Rust's `std::backtrace::Backtrace` was meant to improve error observability. The
 
 ### The Provide/Request API: Overengineering in Action
 
-The [Provider API (RFC 3192)](https://github.com/rust-lang/rust/issues/96024) and [generic member access (RFC 2895)](https://github.com/rust-lang/rfcs/pull/2895) add dynamic type-based data access to errors:
+The [Provider API (RFC 3192)](https://github.com/rust-lang/rfcs/pull/3192#issuecomment-1018020335) and [generic member access (RFC 2895)](https://github.com/rust-lang/rfcs/pull/2895) add dynamic type-based data access to errors:
 
 ```rust
 fn provide<'a>(&'a self, request: &mut Request<'a>) {
