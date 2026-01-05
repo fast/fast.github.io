@@ -100,7 +100,7 @@ fn process_request(req: Request) -> anyhow::Result<Response> {
 
 Every `?` is a missed opportunity to add context. What was the user ID? What API were we calling? What computation failed? The error knows none of this.
 
-The `anyhow` documentation encourages using `.context()` to add information. But `.context()` is optional--the type system doesn't require it. "I'll add context later" is the easiest lie to tell yourself. Later means never--until 3am when production is on fire.
+The `anyhow` documentation encourages using `.context()` to add information. But `.context()` is optional--the type system doesn't require it. And "I'll add context later" is the easiest lie to tell yourself.
 
 ---
 
@@ -125,7 +125,7 @@ It looks neat, well-structured, and it compiles. But pause and ask:
 
 - If you are holding a `DatabaseError::Query`, is it retryable? Should you show the raw SQL error to users? The error type doesn't help answer these questions.
 
-- When debugging at 3 AM, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?
+- When debugging, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?
 
 This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors exactly, on making the types line up. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
 
@@ -139,24 +139,18 @@ The real question isn't whether you're writing a library or an application. The 
 
 ## Two Audiences, Two Needs
 
-Let's be explicit about who consumes errors and what they need:
-
 | Audience | Goal | Needs |
 |----------|------|-------|
 | **Machines** | Automated recovery | Flat structure, clear error kinds, predictable codes |
 | **Humans** | Debugging | Rich context, call path, business-level information |
 
-When a retry middleware receives an error, it doesn't care about your beautifully nested error chain. It just needs to know: *is this retryable?* A simple boolean or enum variant suffices.
-
-When you're debugging at 3am, you don't need to know that somewhere deep in the stack there was an `io::Error`. You need to know: *which file, which user, which request, what were we trying to do?*
-
-Most error handling designs optimize for neither audience. They optimize for *the compiler*.
+Most error handling designs optimize for neither. They optimize for *the compiler*.
 
 ### For Machines: Flat, Actionable, Kind-Based
 
 When errors need to be handled programmatically, complexity is the enemy. Your retry logic doesn't want to traverse a nested error chain checking for specific variants. It wants to ask: `is_retryable()?`
 
-Here's a pattern that works, drawn from [Apache OpenDAL's error design](https://github.com/apache/opendal/pull/977):
+[Apache OpenDAL's error design](https://github.com/apache/opendal/pull/977) shows one way to do this:
 
 ```rust
 pub struct Error {
@@ -198,7 +192,7 @@ match result {
 }
 ```
 
-Notice the key design decisions:
+A few things to note:
 
 **ErrorKind is categorized by response, not origin.** `NotFound` means "the thing doesn't exist, don't retry." `RateLimited` means "slow down and try again." The caller doesn't need to know whether it was an S3 404 or a filesystem ENOENT--they need to know what to do about it.
 
@@ -214,7 +208,7 @@ The biggest enemy of good error context isn't capability--it's friction. If addi
 
 The [exn](https://github.com/fast/exn) library (294 lines of Rust, zero dependencies) demonstrates one approach: errors form a *tree* of frames, each automatically capturing its source location via `#[track_caller]`. Unlike linear error chains, trees can represent multiple causes--useful when parallel operations fail or validation produces multiple errors.
 
-Here's what we need:
+The key ingredients:
 
 **Automatic location capture.** Instead of expensive backtraces, use `#[track_caller]` to capture file/line/column at **zero cost**. Every error frame should know where it was created.
 
@@ -268,7 +262,7 @@ pub fn fetch_user(user_id: &str) -> Result<User, Exn<ServiceError>> {
 
 The type system becomes your ally: it won't let you be lazy at module boundaries.
 
-Here's what this looks like in practice:
+In practice:
 
 ```rust
 pub async fn execute(&self, task: Task) -> Result<Output, ExecutorError> {
