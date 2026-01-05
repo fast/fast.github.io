@@ -11,7 +11,7 @@ It's 3am. Production is down. You're staring at a log line that says:
 Error: serialization error: expected ',' or '}' at line 3, column 7
 ```
 
-You know JSON is broke. But you have zero idea *why*, *where*, or *who* caused it. Was it the config loader? The user API? The webhook consumer?
+You know JSON is broken. But you have zero idea *why*, *where*, or *who* caused it. Was it the config loader? The user API? The webhook consumer?
 
 The error has successfully bubbled up through 20 layers of your stack, preserving its original message perfectly, yet losing every scrap of meaning along the way.
 
@@ -29,15 +29,15 @@ As noted in a [detailed analysis of error handling in a large Rust project](http
 
 ### The `std::error::Error` Trait: A Noble but Flawed Abstraction
 
-Rust's `std::error::Error` trait assumes errors form a chain--each error has an optional `source()` pointing to the underlying cause. This works for most cases; the vast majority of errors have no source or a single one.
+The standard `Error` trait is built around `source()`: one error optionally points to another. That matches a lot of failures.
 
-But as a *standard library* abstraction, it's too opinionated. It categorically excludes cases where sources form a tree: a validation error with multiple field failures, a timeout with partial results. These scenarios exist, and the standard trait offers no way to represent them.
+But some of the nastiest problems aren’t a single line of causality. Validation can fail in five places at once. A batch operation can partially succeed. Timeouts can come with partial results. Those want something closer to a set or a tree of causes, not a single chain.
 
 ### Backtraces: Expensive Medicine for the Wrong Disease
 
-Rust's `std::backtrace::Backtrace` was meant to improve error observability. They're better than nothing. But they have serious limitations:
+Rust's `std::backtrace::Backtrace` was meant to improve error observability. It's better than nothing. But they have serious limitations:
 
-**In async code, they're nearly useless.** Your backtrace will contain [49 stack frames, of which 12 are calls to `GenFuture::poll()`](https://github.com/rust-lang/rust/issues/74779). The [Async Working Group notes](https://rust-lang.github.io/wg-async/design_docs/async_stack_traces.html) that suspended tasks are invisible to traditional stack traces.
+**In async code, they can be noisy or misleading.** Your backtrace will contain [49 stack frames, of which 12 are calls to `GenFuture::poll()`](https://github.com/rust-lang/rust/issues/74779). The [Async Working Group notes](https://rust-lang.github.io/wg-async/design_docs/async_stack_traces.html) that suspended tasks are invisible to traditional stack traces.
 
 **They only show the origin, not the path.** A backtrace tells you where the error was *created*, not the logical path it took through your application. It won't tell you "this was the request handler for user X, calling service Y, with parameters Z."
 
@@ -53,15 +53,13 @@ fn provide<'a>(&'a self, request: &mut Request<'a>) {
 }
 ```
 
-The unstable `Provide`/`Request` API represents the latest attempt to make errors more flexible. The idea: errors can dynamically provide typed context (like HTTP status codes or backtraces) that callers can request at runtime.
-
-This sounds powerful. In practice, it introduces new problems:
+The unstable `Provide`/`Request` API represents the latest attempt to make errors more flexible. The idea: errors can dynamically provide typed context (like HTTP status codes or backtraces) that callers can request at runtime. In practice, it introduces new problems:
 
 **Unpredictability**: Your error *might* provide an HTTP status code. Or it might not. You won't know until runtime.
 
 **Complexity**: The API is subtle enough that [LLVM struggles to optimize multiple provide calls](https://github.com/rust-lang/rfcs/pull/3192#issuecomment-1018020335).
 
-Sometimes, a simple struct with named fields is better than a clever abstraction.
+Most of the time, a boring struct with named fields is still the thing you want.
 
 ### `thiserror`: Categorizing by Origin, Not by Action
 
@@ -79,9 +77,9 @@ pub enum DatabaseError {
 }
 ```
 
-This looks reasonable. But notice how this common practice categorizes errors: by *origin*, not by *what the caller can do about it*.
+This looks reasonable. But notice how this common practice categorizes errors: by origin, not by what the caller can do about it.
 
-When you receive a `DatabaseError::Query`, what should you do? Retry? Report to the user? Log and continue? The error doesn't tell you. It just tells you which dependency failed.
+When you receive a `DatabaseError::Query`, what should you do? Retry? Report raw SQL to the user? The error doesn't tell you. It just tells you which dependency failed.
 
 As one blogger [aptly put it](https://mmapped.blog/posts/12-rust-error-handling): "This error type does not tell the caller what problem you are solving but how you solve it."
 
@@ -89,7 +87,7 @@ As one blogger [aptly put it](https://mmapped.blog/posts/12-rust-error-handling)
 
 `anyhow` takes the opposite approach: type erasure. Just use `anyhow::Result<T>` everywhere and propagate with `?`. No more enum variants, no more `#[from]` annotations.
 
-The problem? It's *too* convenient.
+The problem is that it's *too* convenient.
 
 ```rust
 fn process_request(req: Request) -> anyhow::Result<Response> {
@@ -123,13 +121,13 @@ pub enum ServiceError {
 }
 ```
 
-This looks reasonable. But ask yourself:
+It looks neat, well-structured, and it compiles. But pause and ask:
 
-1. **What can the caller do with `ServiceError::Database`?** Can they retry? Should they show the raw SQL error to users? The error type doesn't help answer these questions.
+- If you are holding a `DatabaseError::Query`, is it retryable? Should you show the raw SQL error to users? The error type doesn't help answer these questions.
 
-2. **When debugging at 3 AM**, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?
+- When debugging at 3 AM, does "serialization error: expected `,` or `}`" tell you which request, which field, which code path led here?
 
-This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors exactly, on making the types line up, on satisfying the compiler. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
+This is the fundamental disconnect in how we think about error handling. We focus on *propagating* errors exactly, on making the types line up. But we forget that errors are messages--messages that will eventually be read by either a machine trying to recover, or a human trying to debug.
 
 ## The "Library vs Application" Myth
 
@@ -184,10 +182,9 @@ pub enum ErrorStatus {
 }
 ```
 
-This design enables clear decision-making:
+Then the call site stays straightforward:
 
 ```rust
-// Caller can make informed decisions
 match result {
     Err(e) if e.kind() == ErrorKind::RateLimited && e.is_temporary() => {
         sleep(Duration::from_secs(1)).await;
@@ -250,7 +247,7 @@ fn fetch_user(user_id: &str) -> Result<User, AppError> {
 }
 ```
 
-**Enforce context at module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always use `?` and move on--the type system won't stop you. The context methods exist, but but *nothing* prevents you from ignoring them.
+**Enforce context at module boundaries.** This is where exn differs critically from `anyhow`. With `anyhow`, every error is erased to `anyhow::Error`, so you can always use `?` and move on--the type system won't stop you. The context methods exist, but *nothing* prevents you from ignoring them.
 
 exn takes a different approach: `Exn<E>` preserves the outermost error type. If your function returns `Result<T, Exn<ServiceError>>`, you can't directly `?` a `Result<U, Exn<DatabaseError>>`--the types don't match. The compiler *forces* you to call `or_raise()` and provide a `ServiceError`, which is exactly the moment you should be adding context about what your module was trying to do.
 
@@ -277,8 +274,12 @@ Here's what this looks like in practice:
 pub async fn execute(&self, task: Task) -> Result<Output, ExecutorError> {
     let make_error = || ExecutorError(format!("failed to execute task {}", task.id));
 
-    let user = self.fetch_user(task.user_id).await.or_raise(make_error)?;
-    let result = self.process(user).or_raise(make_error)?;
+    let user = self.fetch_user(task.user_id)
+        .await
+        .or_raise(make_error)?;
+
+    let result = self.process(user)
+        .or_raise(make_error)?;
 
     Ok(result)
 }
@@ -293,8 +294,6 @@ failed to execute task 7829, at src/executor.rs:45:12
 |
 |-> connection refused, at src/client.rs:89:24
 ```
-
-Now you know: it was task 7829, we were fetching user data, and the connection was refused. You can grep for that task ID in your request logs and find everything you need.
 
 ---
 
@@ -349,29 +348,20 @@ match save_document(doc).await {
             }
             return Err(map_to_http_status(err.kind));
         }
-
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 ```
 
-Yes, you still need to walk the tree. But unlike the `Provide`/`Request` API, you end up with a concrete type like `StorageError`—a documented struct with named fields that your IDE can autocomplete. No guessing, no runtime surprises—just something you can reason about and maintain.
+You do have to walk the tree—but compare that to the Provide/Request API. Here you’re searching for a concrete type, like `StorageError`: it has named fields, it’s documented, and your IDE can autocomplete it. No guesswork, no runtime surprises—just a well-defined struct you can understand and maintain.
 
 ---
 
-## Conclusion
+## Closing thought
 
-The next time you write a function, look at the `Result` return type.
+Propagating errors is easy in Rust. Explaining them is the part we tend to postpone.
 
-Don't think of it as "I might fail."
-Think of it as "I might need to explain myself."
-
-If your error type can't answer "Should I retry?"--you failed the Machine.
-If your error logs don't answer "Which user was it?"--you failed the Human.
-
-Errors aren't just failure modes to be propagated. They're communication. They're the messages your system sends when things go wrong. And like any communication, they deserve to be designed.
-
-Stop forwarding errors. Start designing them.
+Next time you return a `Result`, take 30 seconds to ask: “If this fails in production, what would I wish the log said?” Then make it say that.
 
 ## Resources
 
